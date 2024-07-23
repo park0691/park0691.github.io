@@ -246,6 +246,11 @@ public class Hello {
 
 내부적으로 어떻게 컴파일러가 코드를 짜 주는지 간접적으로 확인한 부분이 흥미로웠습니다.
 
+## 더 궁금한 것 (혼잣말)
+스트링 리터럴은 Constant Pool에도 저장되고 String Constant Pool에도 저장되는 것처럼 기술되어 있다. 포스트에 기술하지 않았지만, JVM Spec 문서에 따르면 Constant Pool에 저장될 때 구조체에 상수들이 저장되는 것으로 나오는데, 거기에 스트링 리터럴도 저장된다.<br/>그런데 그 구조체는 Constant Pool에만 저장되는 것으로 보인다.(아닐 수도...) 그 데이터가 String Constant Pool에 저장되는 것은 아닌 것 같은데...? 흠...
+
+정리하자면, 지금까지 본 내용만으로 Constant Pool에 저장된 스트링 리터럴이 어떻게 String Constant Pool에 저장되는지 알 수 없다. 스트링 리터럴은 두 군데 다 저장되는데, Runtime Constant Pool과 어떤 관계이고 String Constant Pool에 어떻게 저장되는지 궁금했다. 시간 될 때 추가적으로 알아봐야겠다.
+
 ## 참고 자료
 - https://blogs.oracle.com/javamagazine/post/java-class-file-constant-pool
 - https://docs.oracle.com/en/java/javase/17/docs/specs/man/javap.html
