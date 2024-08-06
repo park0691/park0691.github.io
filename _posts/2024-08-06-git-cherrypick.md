@@ -1,6 +1,6 @@
 ---
 title: merge commit을 다시 commit하고 싶을 때 (feat. git cherry-pick)
-date: 2024-08-02 20:30 +0900
+date: 2024-08-06 13:00 +0900
 categories: Tutorial
 tags: git cherry pick
 ---
