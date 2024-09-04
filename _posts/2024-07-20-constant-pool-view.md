@@ -1,7 +1,7 @@
 ---
 title: Constant Pool, 상수 풀은 어떻게 생겼을까?
 date: 2024-07-20 18:00 +0900
-categories: Java Core
+categories: Java
 tags: runtime constant pool string
 ---
 Runtime Constant Pool, Constant Pool, String Pool 등 JVM을 학습하며 비슷하면서 다른 용어가 많이 나와서 혼동되었습니다. 또한 단순히 문자열, 숫자, 메소드의 참조가 저장된다는 의미가 와닿지 않아 상수 풀에 어떻게 저장되는지 직접 한 번 보면서 정리하고자 합니다.

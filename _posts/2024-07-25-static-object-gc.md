@@ -1,7 +1,7 @@
 ---
 title: static object는 GC의 대상인가?
 date: 2024-07-26 18:00 +0900
-categories: Java Core
+categories: Java
 tags: java static garbage collection gc metaspace permanent generation heap
 ---
 static 키워드는 조심해서 사용해야 한다. static 멤버는 프로그램 종료시까지 메모리에 남아있기 때문에 메모리 누수 발생으로 애플리케이션 성능 저하의 원인이 될 수 있기 때문이다.<br/>

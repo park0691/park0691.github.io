@@ -1,7 +1,7 @@
 ---
 title: 호출할 메소드는 어떤 매커니즘으로 결정될까?
 date: 2024-08-01 20:30 +0900
-categories: Java Core
+categories: Java
 tags: dynamic dispatch static double polymorphism 다형성
 ---
 OOP의 특징 중 하나인 다형성은 하나의 메서드나 클래스가 여러 가지 형태로 동작하는 성질을 의미합니다.
