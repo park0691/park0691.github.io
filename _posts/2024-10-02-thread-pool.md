@@ -1,13 +1,14 @@
 ---
-title: Thread Pool, 스레드 풀이란?
+title: 스레드 풀을 왜 사용할까?
 date: 2024-10-02 18:00 +0900
 categories: [Java]
 tags: thread pool
 ---
-자바 스레드 프로그래밍을 공부하면서 스레드 풀 개념이 나왔다.
+자바 스레드 프로그래밍 Future, Executor 관련 클래스들을 공부하면서 계속 나오는 스레드 풀 `Thread Pool` 에 대해 알아보고자 한다. 해외 사이트 문서를 이용하여 실제 자바에서 스레드 풀이 어떻게 구현되는지도 간단히 알아보았다.
 
 ## 개념
-
+![문제 상황](../assets/img/posts/20241002-java-thread-pool.png)
+_출처 : https://www.baeldung.com/thread-pool-java-and-guava_
 
 미리 일정 개수의 스레드를 미리 생성해 보관하고 있다가, 작업 요청이 발생하면 미리 생성해 둔 스래드로 작업을 처리하는 방식을 말한다. 이 때 작업이 끝난 스레드는 종료되지 않으며 다음 작업 요청이 들어올 때까지 대기했다가 재사용된다.
 
@@ -42,6 +43,11 @@ tags: thread pool
 - 메모리 낭비<br/>
 	스레드 풀은 일정 수의 스레드를 미리 만들어두는데, 너무 많은 스레드를 생성해 두고 다 사용하지 않으면 메모리만 차지하고 노는 스레드가 존재하게 되어 메모리 낭비로 이어질 수 있다.
 
+- 풀 크기 설정의 어려움
+	크기를 너무 작게 설정하면 동시 작업을 효율적으로 처리하지 못하여 성능이 저하될 수 있다. 반대로 너무 크게 설정하면 과도한 스레드 생성으로 인한 오버헤드, 자원 낭비가 발생한다.
+
+- 작업의 특성에 따른 비효율
+	스레드 풀의 스레드가 다 사용 중인 상태에서 대기 큐에 I/O 바운드 작업, 네트워크 연결을 기다리는 작업이 있으면 애플리케이션 성능이 급격히 저하될 수 있다.
 
 
 ## Thread Pool in Java
@@ -70,7 +76,7 @@ Future<String> future = executorService.submit(() -> "Hello World");
 String result = future.get();
 ```
 
-#### ThreadPoolExecutor
+### ThreadPoolExecutor
 `ThreadPoolExecutor`는 다양한 파라미터와 튜닝을 위한 hooks을 제공하여 다양한 형태의 스레드 풀을 구현할 수 있다.
 
 스레드 풀은 내부에 항상 유지되는 고정된 수의 **<u>코어 스레드</u>**와 생성되었다 더 이상 필요없을 때 제거될 수 있는 **<u>여분의 스레드</u>**로 구성된다.
@@ -289,12 +295,164 @@ String result = future.get();
 
     또한 이 ThreadPoolExecutor는 Immutable Wrapper로 랩핑되어 있으므로 생성 후 재구성될 수 없다. 그렇기 때문에 `ThreadPoolExecutor`로 캐스팅할 수 없다.
 
-#### ScheduledThreadPoolExecutor
-TODO
+### ScheduledThreadPoolExecutor
+ScheduledThreadPoolExecutor는 `ThreadPoolExecutor` 클래스를 확장하고 여러 추가 메서드와 함께 `ScheduledExecutorService` 인터페이스를 구현한다.
+- `schedule` 메서드는 지정된 딜레이 타임 후에 작업을 수행하도록 설정한다.
+
+```java
+/**
+ * Submits a periodic action that becomes enabled first after the
+ * given initial delay, and subsequently with the given period;
+ * that is, executions will commence after
+ * {@code initialDelay}, then {@code initialDelay + period}, then
+ * {@code initialDelay + 2 * period}, and so on.
+ *
+ * <p>The sequence of task executions continues indefinitely until
+ * one of the following exceptional completions occur:
+ * <ul>
+ * <li>The task is {@linkplain Future#cancel explicitly cancelled}
+ * via the returned future.
+ * <li>Method {@link #shutdown} is called and the {@linkplain
+ * #getContinueExistingPeriodicTasksAfterShutdownPolicy policy on
+ * whether to continue after shutdown} is not set true, or method
+ * {@link #shutdownNow} is called; also resulting in task
+ * cancellation.
+ * <li>An execution of the task throws an exception.  In this case
+ * calling {@link Future#get() get} on the returned future will throw
+ * {@link ExecutionException}, holding the exception as its cause.
+ * </ul>
+ * Subsequent executions are suppressed.  Subsequent calls to
+ * {@link Future#isDone isDone()} on the returned future will
+ * return {@code true}.
+ *
+ * <p>If any execution of this task takes longer than its period, then
+ * subsequent executions may start late, but will not concurrently
+ * execute.
+ *
+ * @throws RejectedExecutionException {@inheritDoc}
+ * @throws NullPointerException       {@inheritDoc}
+ * @throws IllegalArgumentException   {@inheritDoc}
+ */
+public ScheduledFuture<?> scheduleAtFixedRate(Runnable command,
+                                              long initialDelay,
+                                              long period,
+                                              TimeUnit unit) {
+```
+- `scheduleAtFixedRate` 메서드는 지정된 초기 딜레이 후에 작업을 실행한 다음 특정 주기동안 반복적으로 실행할 수 있게 해 준다. `period` 파라미터는 작업의 시작 시간 사이에 측정된 시간이므로 실행 속도가 고정된다.
+
+```java
+/**
+ * Submits a periodic action that becomes enabled first after the
+ * given initial delay, and subsequently with the given delay
+ * between the termination of one execution and the commencement of
+ * the next.
+ *
+ * <p>The sequence of task executions continues indefinitely until
+ * one of the following exceptional completions occur:
+ * <ul>
+ * <li>The task is {@linkplain Future#cancel explicitly cancelled}
+ * via the returned future.
+ * <li>Method {@link #shutdown} is called and the {@linkplain
+ * #getContinueExistingPeriodicTasksAfterShutdownPolicy policy on
+ * whether to continue after shutdown} is not set true, or method
+ * {@link #shutdownNow} is called; also resulting in task
+ * cancellation.
+ * <li>An execution of the task throws an exception.  In this case
+ * calling {@link Future#get() get} on the returned future will throw
+ * {@link ExecutionException}, holding the exception as its cause.
+ * </ul>
+ * Subsequent executions are suppressed.  Subsequent calls to
+ * {@link Future#isDone isDone()} on the returned future will
+ * return {@code true}.
+ *
+ * @throws RejectedExecutionException {@inheritDoc}
+ * @throws NullPointerException       {@inheritDoc}
+ * @throws IllegalArgumentException   {@inheritDoc}
+ */
+public ScheduledFuture<?> scheduleWithFixedDelay(Runnable command,
+                                                 long initialDelay,
+                                                 long delay,
+                                                 TimeUnit unit) {
+```
+- `scheduleWithFixedDelay` 메서드는 주어진 작업을 반복적으로 실행한다는 점에서 `scheduleAtFixedRate` 메서드와 유사하지만, 지정된 딜레이 타임은 이전 작업의 끝과 다음 작업의 시작 시간 사이에서 측정된다. 실행 속도는 주어진 작업을 실행하는데 걸리는 시간에 따라 달라질 수 있다.
 
 
-#### ForkJoinPool
-TODO
+일반적으로 `Executors.newScheduledThreadPool()` 메서드를 사용하여 지정된 corePoolSize, 제한 없는 maximumPoolSize 및 keepAliveTime = 0을 갖는 ScheduledThreadPoolExecutor 를 생성한다.
+
+500ms 내에 실행되도록 작업을 예약하는 방법은 다음과 같다.
+
+```java
+ScheduledExecutorService executor = Executors.newScheduledThreadPool(5);
+executor.schedule(() -> {
+    System.out.println("Hello World");
+}, 500, TimeUnit.MILLISECONDS);
+```
+
+다음 코드는 500ms 지연 후 작업을 실행한 다음 100ms마다 반복하는 방법을 보여준다. 작업을 예약한 후 CountDownLatch 잠금을 사용하여 세 번 실행될 때까지 기다린 후 Future.cancel() 메서드를 사용하여 취소한다.
+
+```java
+CountDownLatch lock = new CountDownLatch(3);
+ScheduledExecutorService executor = Executors.newScheduledThreadPool(5);
+ScheduledFuture<?> future = executor.scheduleAtFixedRate(() -> {
+    System.out.println("Hello World");
+    lock.countDown();
+}, 500, 100, TimeUnit.MILLISECONDS);
+
+lock.await(1000, TimeUnit.MILLISECONDS);
+future.cancel(true);
+```
+
+### ForkJoinPool
+ForkJoinPool은 Java 7에 도입된 Fork/Join Framework의 핵심이다. 재귀 방식으로 여러 작업을 나누어 문제를 해결한다. 서브 태스크를 포함한 모든 작업은 실행되기 위해 자체 스레드가 필요하므로 간단한 `ThreadPoolExecutor`를 사용하면 스레드가 빠르게 소진된다.
+
+Fork/Join Framework에서 모든 작업은 수많은 여러 서브 태스크를 생성(`fork`) 하고 `join` 메서드를 사용하여 서브 태스크들의 완료될 때까지 기다린다. 이 프레임워크의 장점은 각 작업 및 서브 태스크를 위한 새로운 스레드를 생성하지 않는 대신 Work Stealing 알고리즘을 구현한다는 점이다.
+
+ForkJoinPool을 사용하여 노드 트리를 탐색하고 모든 리프 값의 합을 계산하는 간단한 예제 코드이다.
+```java
+public class CountingTask extends RecursiveTask<Integer> {
+
+    private final TreeNode node;
+
+    public CountingTask(TreeNode node) {
+        this.node = node;
+    }
+
+    @Override
+    protected Integer compute() {
+        return node.value + node.children.stream()
+                .map(childNode -> new CountingTask(childNode).fork())
+                .collect(Collectors.summingInt(ForkJoinTask::join));
+    }
+
+    public static void main(String[] args) {
+        TreeNode tree = new TreeNode(5,
+                new TreeNode(3), new TreeNode(2,
+                new TreeNode(2), new TreeNode(8)));
+
+        ForkJoinPool forkJoinPool = ForkJoinPool.commonPool();
+        int sum = forkJoinPool.invoke(new CountingTask(tree));
+        System.out.println(sum);
+    }
+    
+    static class TreeNode {
+        int value;
+        Set<TreeNode> children;
+
+        TreeNode(int value, TreeNode... children) {
+            this.value = value;
+            this.children = new HashSet<>(Arrays.asList(children));
+        }
+    }
+}
+```
+트리의 모든 값을 병렬로 합산하려면 `RecursiveTask<Integer>` 클래스를 확장해야 한다. 각 작업은 자체 토드를 받고 해당 값을 자식 값의 합에 더한다.
+
+자식 값의 합을 계산하기 위해 작업 구현은 다음을 수행한다.
+1. 자식 set의 stream을 만든다.
+2. 이 stream의 map을 만들고 각 요소에 대해 새 CountingTask를 생성한다.
+3. 각 서브 태스크를 fork 하여 실행한다.
+4. fork된 각 작업에서 join 메서드를 호출하여 결과를 collect 한다.
+5. `Collectors.summingInt` 컬렉터를 사용하여 결과를 합산한다.
 
 
 ## References
