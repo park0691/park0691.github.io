@@ -1,5 +1,5 @@
 ---
-title: 'HashMap 해부(1) : 구조와 데이터의 초기 저장 과정'
+title: 'HashMap 해부 (1) : 구조와 데이터의 초기 저장 과정'
 date: 2025-06-26 12:00 +0900
 categories: Java
 tags: hashmap,hash,collections
@@ -13,7 +13,7 @@ Java 해싱 및 해시맵 관련하여 공부한 지식적인 내용은
 
 [https://park0691.github.io/TIL/java/collections-map.html](https://park0691.github.io/TIL/java/collections-map.html)
 
-에 정리해두었다. 본 포스트에서는 이 기본 지식을 바탕으로 Java 8 버전의 `HashMap` 소스 코드를 직접 분석하며 해시맵이 내부적으로 어떻게 동작하고 데이터를 관리하는지 직접 확인하며, 그 숨겨진 원리들을 파헤쳐 보고자 한다.
+에 정리해두었다. 본 포스트에서는 이 기본 지식을 바탕으로 Java 8 `HashMap` 소스 코드를 직접 분석하며 해시맵이 내부적으로 어떻게 동작하고 데이터를 관리하는지 직접 확인하며, 그 숨겨진 원리들을 파헤쳐 보고자 한다.
 
 #### 요약
 이번 포스트에서는 다음 내용을 위주로 살펴본다.
@@ -216,7 +216,7 @@ transient int modCount;
 
     - 해시맵의 구조 변경 횟수 (e.g. 리해싱)
     - `fail-fast` 동작을 위한 값으로, `Iterator`에서 `CooncurrentModificationException` 발생에 사용된다.
-    
+
 
 
 5. threshold
@@ -454,7 +454,7 @@ final V putVal(int hash, K key, V value, boolean onlyIfAbsent,
 - 50L | `afterNodeInsertion()` 코드는 주로 `LinkedHashMap`에서 구현하는 부분으로 `HashMap`에서는 직접적인 동작을 유발하지 않는다.
 
 #### 데이터를 처음 저장할 때
-앞서 해시맵 생성 시점에 해시 테이블이 초기화되지 않는 것을 확인했다. 해시맵에 데이터를 처음 저장하는 시점에 해시맵이 초기화된다. 위 코드 중 두 `if` 문이 해시맵에 데이터를 처음 저장할 때 수행되는 핵심 로직이다.
+앞서 해시맵 생성 시점에 해시 테이블이 초기화되지 않는 것을 확인했다. 해시맵에 데이터를 처음 저장하는 시점에 해시테이블이 초기화된다. 위 코드 중 아래의 두 `if` 문이 해시맵에 데이터를 처음 저장할 때 수행되는 핵심 로직이다.
 ![images](https://1drv.ms/i/c/9251ef56e0951664/IQT4PkAe6r8LTJGqEQQSHwrmAdbt1xxMtrwDRLxCP-9pWvc)
 _HashMap 생성 후 데이터를 처음 저장(put() 호출)할 때 putVal()에서 수행되는 코드_
 
@@ -596,7 +596,7 @@ Node<K,V> newNode(int hash, K key, V value, Node<K,V> next) {
 }
 ```
 
-#### 실제 동작 디버깅
+#### 실제 동작 살펴보기
 
 예를 들어 다음과 같은 간단한 구조의 해시맵에 데이터를 넣었다 가정하자.
 
@@ -621,8 +621,8 @@ Node<K,V> newNode(int hash, K key, V value, Node<K,V> next) {
 
 ![images](https://1drv.ms/i/c/9251ef56e0951664/IQRuLPCV1v8jQ4ZTKrg4oZt6AeSJVjKD0JhskYOnFnq2VwU)
 
-- `resize()` 메소드 리턴 시점에서 해시 테이블 내부 멤버 변수를 보면
-    - 해시 테이블 `table` 이 길이 `16`의 `Node` 타입 배열로 생성된 것을 확인할 수 있고,
+- `resize()` 메소드 리턴 시점에서 해시맵 내부 멤버 변수를 보면
+    - 해시 테이블 `table` 이 길이 `16`의 `Node` 타입 배열로 초기화된 것을 확인할 수 있고,
     - `threshold` 값도 `12`로 초기화된 것을 확인할 수 있다.
 
 `resize()` 호출 후의 `putVal()` 동작을 보면 (`if ((p = tab[i = (n - 1) & hash]) == null)` 코드 라인부터)
@@ -638,9 +638,13 @@ Node<K,V> newNode(int hash, K key, V value, Node<K,V> next) {
     - 실제로 `table[1]` 에 저장한 데이터가 들어가있는 것을 확인할 수 있고,
     - `size`가 `1` 증가된 것을 확인할 수 있다.
 
-위 코드 수행 후 해시 테이블 구조를 그러보면
+내부 테이블을 더 정확히 살펴보기 위해 IntelliJ 설정을 바꿔서 내부 Node 멤버 변수가 보이도록 셋팅한 뒤 확인하면 더 정확히 확인할 수 있다. (객체의 레퍼런스는 일부 바뀌어 보임)
 
 ![images](https://1drv.ms/i/c/9251ef56e0951664/IQQZU_xZ6KDDSLZ2Tq0QqBGnAWWuWin3yKFLowwC3PxkJII)
+
+위 코드 수행 후 해시 테이블 구조를 그러보면
+
+![images](https://1drv.ms/i/c/9251ef56e0951664/IQSfkNgTC-qPRKresbyyPOdFAdJZGu0c6AGTqxnfbJRx79k)
 
 ## References
 - gpt4o
