@@ -58,20 +58,20 @@ static final float DEFAULT_LOAD_FACTOR = 0.75f;
 - Load Factor를 초과하면 리사이징 발생한다.
 
 4. TREEIFY_THRESHOLD
-```java
-/**
- * The bin count threshold for using a tree rather than list for a
- * bin.  Bins are converted to trees when adding an element to a
- * bin with at least this many nodes. The value must be greater
- * than 2 and should be at least 8 to mesh with assumptions in
- * tree removal about conversion back to plain bins upon
- * shrinkage.
- */
-static final int TREEIFY_THRESHOLD = 8;
-```
-
-- 해시 버킷 하나에 `TREEIFY_THRESHOLD` 개수 이상의 요소가 충돌하면 트리 구조(Red-Black Tree)로 변환한다.
-    - 특정 해시 버킷에 데이터가 많이 충돌하여 연결 리스트의 길이가 8 이상이 되면 해시맵은 해당 버킷의 성능 저하(최악인 경우 O(N))를 방지하기 위해 연결 리스트를 이진 탐색 트리(Red-Black Tree)로 변환하여 탐색 시간을 O(logN)으로 개선한다.
+    
+    ```java
+    /**
+     * The bin count threshold for using a tree rather than list for a
+     * bin.  Bins are converted to trees when adding an element to a
+     * bin with at least this many nodes. The value must be greater
+     * than 2 and should be at least 8 to mesh with assumptions in
+     * tree removal about conversion back to plain bins upon
+     * shrinkage.
+     */
+    static final int TREEIFY_THRESHOLD = 8;
+    ```
+    - 해시 버킷 하나에 `TREEIFY_THRESHOLD` 개수 이상의 요소가 충돌하면 트리 구조(Red-Black Tree)로 변환한다.
+        - 특정 해시 버킷에 데이터가 많이 충돌하여 연결 리스트의 길이가 8 이상이 되면 해시맵은 해당 버킷의 성능 저하(최악인 경우 O(N))를 방지하기 위해 연결 리스트를 이진 탐색 트리(Red-Black Tree)로 변환하여 탐색 시간을 O(logN)으로 개선한다.
 
 
 5. UNTREEIFY_THRESHOLD
@@ -87,23 +87,24 @@ static final int UNTREEIFY_THRESHOLD = 6;
 
 
 6. MIN_TREEIFY_CAPACITY
-```java
-/**
- * The smallest table capacity for which bins may be treeified.
- * (Otherwise the table is resized if too many nodes in a bin.)
- * Should be at least 4 * TREEIFY_THRESHOLD to avoid conflicts
- * between resizing and treeification thresholds.
- */
-static final int MIN_TREEIFY_CAPACITY = 64;
-```
-- 해시 테이블의 전체 크기가 64 미만이면 트리로 변환하지 않고 리사이징을 우선한다.
-    - 이는 테이블 크기가 작을 때 특정 버킷만 트리로 만드는 것보다 전체 테이블을 확장하여 해시 충돌 가능성을 줄이는 것이 더 효율적이라 판단하기 떄문이다. 트리는 일반 노드보다 메모리 사용량이 많으므로, 작은 맵에서 트리화는 성능이 오히려 떨어질 수 있다.
+    
+    ```java
+    /**
+     * The smallest table capacity for which bins may be treeified.
+     * (Otherwise the table is resized if too many nodes in a bin.)
+     * Should be at least 4 * TREEIFY_THRESHOLD to avoid conflicts
+     * between resizing and treeification thresholds.
+     */
+    static final int MIN_TREEIFY_CAPACITY = 64;
+    ```
+    - 해시 테이블의 전체 크기가 64 미만이면 트리로 변환하지 않고 리사이징을 우선한다.
+        - 테이블 크기가 작을 때 특정 버킷만 트리로 만드는 것보다 전체 테이블을 확장하여 해시 충돌 가능성을 줄이는 것이 더 효율적이라 판단하기 때문이다. 트리는 일반 노드보다 메모리 사용량이 많으므로, 작은 맵에서 트리화는 성능이 오히려 떨어질 수 있다.
 
-> **해시 버킷의 연결 리스트가 트리 구조로 변환되는 조건**<br/>
-> 다음 두 가지 조건을 다 충족하여야 한다. <br/>
-> 1. 버킷 내 노드 개수 임계값 초과 : 해당 버킷에 저장된 엔트리(Node) 개수가 `TREEFIFY_THRESHOLD` 상수값인 8개 이상이 될 때
-> 2. 전체 테이블 용량 임계값 초과 : 전체 테이블 용량(capacity)이 `MIN_TREEIFY_CAPACITY` 상수값인 64 이상이 될 때
-{: .prompt-warning }
+    > **해시 버킷의 연결 리스트가 트리 구조로 변환되는 조건**<br/>
+    > 다음 두 가지 조건을 다 충족하여야 한다. <br/>
+    > 1. 버킷 내 노드 개수 임계값 초과 : 해당 버킷에 저장된 엔트리(Node) 개수가 `TREEFIFY_THRESHOLD` 상수값인 8개 이상이 될 때
+    > 2. 전체 테이블 용량 임계값 초과 : 전체 테이블 용량(capacity)이 `MIN_TREEIFY_CAPACITY` 상수값인 64 이상이 될 때
+    {: .prompt-warning }
 
 ### 멤버 변수
 1. table
