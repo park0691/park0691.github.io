@@ -32,18 +32,93 @@ locks 패키지에 정의된 상호 배제를 위한 Lock API는 `synchronized`�
 ### synchronized와의 차이
 **[유연성]**
 
-- `synchronized`는 블록 구조를 사용하기 때문에 하나의 메서드 안에서 임계 영역의 시작과 끝이 있어야 한다. Lock은 `lock(), unlock()`으로 시작과 끝을 명시하기 때문에 임계 영역을 여러 메서드에 나눠서 작성할 수 있다.
-- 이러한 유연성은 개발자에게 명시적으로 락을 해제해야 하는 책임을 부여하며, 적절한 `unlock()` 호출을 누락하면 데드락이나 리소스 누수로 이어질 수 있다.
+- 암묵적 락 해제 : `synchronized`는 블록 구조를 사용하기 때문에 하나의 블록 안에 임계 영역의 시작과 끝이 있어야 한다. 블록 `{}`이 끝나거나, 블록 안에서 예외가 발생하여 빠져나가면 JVM이 자동으로 락을 해제한다. 개발자가 락 해제를 신경 쓸 필요가 없다.
+
+    ```java
+    public void implicitUnlock() {
+        synchronized(this) {
+            // ...임계 영역...
+        } // 이 지점에서 자동으로 unlock이 일어남
+    }
+    ```
+
+- 명시적 락 해제 : Lock은 `lock()`으로 락을 직접 획득하고 반드시 `unlock()`을 호출하여 락을 수동으로 해제해야 한다. 따라서 임계 영역을 여러 메서드에 나눠서 작성할 수 있다.
+
+    ```java
+    Lock lock = new ReentrantLock();
+    public void explicitUnlock() {
+        lock.lock();
+        try {
+            // ...임계 영역...
+        } finally {
+            lock.unlock(); // 반드시 수동으로 unlock 해야 함
+        }
+    }
+    ```
+
+    - 이러한 유연성은 개발자에게 명시적으로 락을 해제해야 하는 책임을 부여하며, 적절한 `unlock()` 호출을 누락하면 데드락이나 리소스 누수로 이어질 수 있다.
 
 **[공정성]**
 
-- synchronized는 여러 스레드가 경쟁 상태에 있을 때 어떤 스레드가 락을 획득할지 순서를 보장할 수 없으나 Lock은 공정 모드 설정을 통해 락 획득 순서의 공정성을 보장한다.
+- `synchronized`는 여러 스레드가 경쟁 상태에 있을 때 어떤 스레드가 다음 락을 획득할지 순서를 보장할 수 없다. (Non-fair) 락을 오래 기다린 스레드보다 이제 막 락을 요청한 스레드가 먼저 락을 획득하는 기아 상태 발생할 수 있다.
+- 반면, Lock은 공정 모드 설정을 통해 락 획득 순서의 공정성을 보장한다.
 
-**[그외 추가된 기능]**
-- Lock polling 지원
-- 타임 아웃 지정 가능
+**[세밀한 조건부 제어]**
+
 - 대기 중인 스레드를 선별적으로 깨울 수 있다. (`Condition` 객체로 다중 조건 지원)
-- Lock 획득을 위해 Waiting pool에 있는 스레드에게 인터럽트를 걸 수 있다.
+- `synchronized`는 JVM에 내장된 단일 조건 큐(Condition Queue) 만을 사용한다. `wait()`, `notify()`, `notifyAll()` 메서드로 스레드를 제어하는데, `notify()`는 어떤 스레드가 깨어날지 알 수 없고, `notifyAll()`는 불필요한 스레드까지 모드 깨워 성능 저하를 유발할 수 있다.
+- `Lock`은 `newCondition()` 메서드를 통해 여러 개의 `Condition` 객체를 생성할 수 있다. 이를 통해 대기 중인 스레드를 목적에 따라 구분하여 관리하고, <u>원하는 조건의 스레드만 선별적으로 깨울 수 있어 정교한 제어가 가능</u>하다.
+
+**[\[락 대기 중단\]](#lockinterruptibly)**
+- `synchronized` 블록에 진입한 스레드는 다른 스레드가 락을 해제할 때까지 무한정 기다려야만 한다. `Thread.interrupt()`를 호출해도 대기 상태가 중단되지 않아, 교착 상태(Deadlock)에 빠진 스레드를 외부에서 중단시킬 방법이 없다.
+- `Lock`은 `lockInterruptibly()` 메서드를 제공하여 락을 기다리는 도중에 `InterruptedException`을 발생시켜 대기를 중단하고 다른 작업을 수행하도록 제어할 수 있다.
+
+**[락 상태 확인 및 제어 능력]**
+
+- `synchronized`는 일단 락을 얻으려고 시도하면, 락이 풀릴 때까지 무조건 대기(blocking) 밖에 못한다.
+- `ReentrantLock`은  스레드가 락을 기다리는동안 락을 제어하는 강력한 메서드를 제공한다.
+    - 타임 아웃 지정 가능
+    - 락 폴링 지원, Lock Polling
+        - 락을 획득하기 위해 무작정 기다리는 대신, 주기적으로 락을 획득할 수 있는지 확인하는 기법. `tryLock()` 메서드로 구현한다.
+        - `tryLock()`을 호출하는 순간 락을 획득할 수 있으면 `true`를 반환하며, 획득할 수 없다면 기다리지 않고 즉시 `false`를 반환한다. 이 `tryLock()` 메서드를 통해 다양한 락 획득 전략을 구사할 수 있다.
+        
+        ```java
+        ReentrantLock lock = new ReentrantLock();
+
+        // 스레드 A가 락을 오랫동안 점유하고 있다고 가정
+        // lock.lock(); 
+
+        // 스레드 B의 작업
+        Runnable task = () -> {
+            while (true) {
+                // 1. 락 획득 시도 (폴링)
+                if (lock.tryLock()) {
+                    try {
+                        System.out.println("드디어 락 획득 성공! 작업을 시작합니다.");
+                        // 임계 영역: 실제 작업 수행
+                        break; // 루프 탈출
+                    } finally {
+                        lock.unlock();
+                    }
+                } else {
+                    // 2. 락 획득 실패 시
+                    System.out.println("락 획득 실패. 다른 작업을 잠시 수행합니다.");
+                    try {
+                        // 락을 얻지 못한 동안 다른 유용한 작업을 하거나,
+                        // CPU 낭비를 막기 위해 잠시 대기
+                        Thread.sleep(500); 
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
+                }
+            }
+        };
+
+        new Thread(task).start();
+        ```
+        
+        - 장점
+            - 스레드가 멈추지 않는다. `synchronized`를 사용했다면 스레드는 락이 풀릴 때까지 대기하지만, 락 폴링 기법을 통해 다른 대체 작업을 수행할 수 있어 시스템 응답성, 유연성이 크게 향상된다.
 
 ### Lock API
 ![lock](https://1drv.ms/i/c/9251ef56e0951664/IQS6uJN436iMQr_Ei5KGtSUvAdKYRxKIViYugkFfm-Nc0Ik?width=1024)
@@ -94,7 +169,8 @@ public void run() {
             lock.lockInterruptibly();	
             ...
         } catch (InterruptedException e) {
-            System.out.println("Thread was interrupted during sleep.");
+            System.out.println("대기 중 스레드가 인터럽트를 받았습니다.");
+            System.out.println("락 대기를 중단합니다!")
         }
     }
 }
@@ -220,7 +296,7 @@ public class ReentrantLock implements Lock, java.io.Serializable {
 | 메소드 | 설명 |
 | ------ | ------ |
 | int getHoldCount() | 현재 스레드가 락을 몇 번 획득했는지(재진입 횟수) 반환 |
-| boolean isHeldByCurrentThread()  | 현재 스레드의 락 소유 여부 반환 |
+| boolean isHeldByCurrentThread()  | 현재 스레드의 락 보유 여부 반환 |
 | boolean hasQueuedThreads() | 락 획득을 위해 대기 중인 스레드 있는지 여부 반환<br/>언제든지 대기 취소할 수 있으므고 `true` 반환한다해서<br/>조회한 스레드의 락 획득을 보장하지 않는다. |
 | int getQueueLength() | 대기 중인 스레드의 개수 반환<br/>내부 데이터 구조 탐색하는 동안 스레드 수 동적으로 변경될 수 있으므로 추정값임 |
 | boolean hasWaiters(Condition condition) | 지정된 컨디션에 대기 중인 스레드가 존재하는지 확인<br/>언제든 타임아웃, 인터럽트 발생할 수 있기 때문에 `true` 반환한다해서<br/> 미래의 signal이 대기 중인 스레드를 깨울 수 있음을 보장하지 않는다. |
@@ -382,7 +458,7 @@ Java 8부터 도입된 새로운 락으로, ReadWriteLock의 성능을 개선한
 
 ### 모드
 1. 쓰기 모드 : `writeLock()` 사용 시
-    
+   
     ```java
     long stamp = lock.writeLock(); // 배타적 락 획득
     try {
