@@ -10,7 +10,7 @@ tags: reentrantlock, reentrant, lock, concurrent, synchronization, 동기화
 ## java.util.concurrent.locks.Lock
 locks 패키지에 정의된 상호 배제를 위한 Lock API는 `synchronized`보다 더욱 유연하고 정교하게 동기화 처리를 할 수 있다.
 
-> concurrent 패키지
+> **concurrent 패키지**<br/>
 > `java.util.concurrent`는 Java 5에서 추가된 패키지로 동기화와 관련된 다양한 유틸리티 클래스를 제공한다. 패키지에서 제공하는 주요 기능은 다음과 같다.
 > 
 > - locks : 상호 배제를 사용할 수 있는 클래스를 제공한다.
@@ -21,7 +21,7 @@ locks 패키지에 정의된 상호 배제를 위한 Lock API는 `synchronized`�
 > 
 {: .prompt-tip }
 
-> concurrent.locks 패키지 주요 인터페이스
+> **concurrent.locks 패키지 주요 인터페이스**
 > - Lock : 공유 자원에 한번에 한 스레드만 read, write를 수행 가능하도록 한다.
 > - ReadWriteLock : Lock에서 한 단계 발전된 메커니즘을 제공. 공유 자원에 여러 스레드가 읽을 수 있도록 락을 유지하고 쓸 때는 한 스레드만 접근 가능하게 한다.
 > - Condition : Object 클래스의 monitor method인 wait, nofity, notifyAll 메서드를 대체한다. wait → await, notify → signal, notifyAll → signalAll로 생각하면 된다.
@@ -84,10 +84,10 @@ locks 패키지에 정의된 상호 배제를 위한 Lock API는 `synchronized`�
         
         ```java
         ReentrantLock lock = new ReentrantLock();
-
+        
         // 스레드 A가 락을 오랫동안 점유하고 있다고 가정
         // lock.lock(); 
-
+        
         // 스레드 B의 작업
         Runnable task = () -> {
             while (true) {
@@ -113,7 +113,7 @@ locks 패키지에 정의된 상호 배제를 위한 Lock API는 `synchronized`�
                 }
             }
         };
-
+        
         new Thread(task).start();
         ```
         
@@ -201,7 +201,7 @@ if (lock.tryLock()) {  // lock을 얻은 경우
 ## ReentrantLock
 재진입 가능한(한 스레드가 이미 확보한 락을 여러 번 걸 수 있음) 명시적 락으로, `synchronized`로 접근하는 모니터 락과 동일한 동작을 한다.
 
-> 명시적 락<br/>
+> **명시적 락**<br/>
 > 기존 `synchronized`는 암묵적 락으로 프로그래머가 직접 락을 제어하지 않아도 Java가 자동으로 락을 관리(획득/해제)해 줬다. 명시적 락은 프로그래머가 직접 락 객체를 만들고 `lock()`, `unlock()`을 직접 호출하여 락의 획득/해제를 명시적으로 수행하는 방식을 말한다.
 > 
 {: .prompt-tip }
