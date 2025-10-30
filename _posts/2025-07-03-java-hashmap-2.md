@@ -1,5 +1,5 @@
 ---
-title: 'HashMap 해부 (2) : 해시 충돌'
+title: 'HashMap 해부 (2) - 해시 충돌'
 date: 2025-07-03 12:00 +0900
 categories: Java
 tags: hashmap,hash,collections
@@ -281,7 +281,34 @@ HashMap과 같은 해시 기반 컬렉션은 키 객체의 동일성을 판단�
 
 ![images](https://1drv.ms/i/c/9251ef56e0951664/IQTQRscQDL-6SY0zPBae-0zkAVSsmTrlpCOCWo4BNKQp_0k)
 
-트리화에 대한 내용은 다음 포스트에서 자세히 다루겠다.
+트리화를 시도하는 `treeifyBin()` 메소드를 보자.
+
+```java
+final void treeifyBin(Node<K,V>[] tab, int hash) {
+    int n, index; Node<K,V> e;
+    if (tab == null || (n = tab.length) < MIN_TREEIFY_CAPACITY)
+        resize();
+    else if ((e = tab[index = (n - 1) & hash]) != null) {
+        TreeNode<K,V> hd = null, tl = null;
+        do {
+            TreeNode<K,V> p = replacementTreeNode(e, null);
+            if (tl == null)
+                hd = p;
+            else {
+                p.prev = tl;
+                tl.next = p;
+            }
+            tl = p;
+        } while ((e = e.next) != null);
+        if ((tab[index] = hd) != null)
+            hd.treeify(tab);
+    }
+}
+```
+
+- 3L | 해시 테이블 사이즈가 `MIN_TREEIFY_CAPACITY` 미만인 경우 리사이즈 시도한다.
+
+해시 버킷 내 데이터 개수가 8개 이상이 되더라도 트리화 시도 이전, 해시 테이블 사이즈를 체크한다. 해시 테이블 사이즈가 `MIN_TREEIFY_CAPACITY` 미만이면 리사이즈를 시도하는 것을 확인할 수 있다.
 
 ## References
 - gpt4o
