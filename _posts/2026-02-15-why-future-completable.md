@@ -246,6 +246,7 @@ public MyPageResponse getMyPageData(String userId) {
 
 
 ## References
+- https://medium.com/@hjna316/future%EC%99%80-completablefuture-java-%EB%B9%84%EB%8F%99%EA%B8%B0%EC%9D%98-%EC%A7%84%ED%99%94-ede7ed606dc2
+- https://hongchangsub.com/java-completablefuture/
 - Claude Sonet 4
 - Gemini 3.1 Pro
-- https://medium.com/@hjna316/future%EC%99%80-completablefuture-java-%EB%B9%84%EB%8F%99%EA%B8%B0%EC%9D%98-%EC%A7%84%ED%99%94-ede7ed606dc2

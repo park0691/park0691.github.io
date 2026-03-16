@@ -399,6 +399,8 @@ Lock 인스턴스를 만들고 동기화가 필요한 코드의 앞 뒤에 `lock
 ## ReentrantReadWriteLock
 읽기, 쓰기 작업을 분리하여 처리하는 `ReadWriteLock` 인터페이스의 구현체이다. 읽기는 여러 스레드가 동시에 수행할 수 있지만 쓰기는 한 스레드가 독점하여 수행되어야 할 때 사용된다. (읽기에는 공유적이고 쓰기에는 베타적인 락)
 
+대다수의 작업은 데이터 변경이 아닌 읽기 작업이다. 이런 상황에서는 락의 조건을 풀어 읽기 연산은 여러 스레드에서 동시에 실행할 수 있도록 해주면 성능을 크게 향상시킬 수 있다.
+
 특정 컬렉션을 사용할 때 동시성 개선에 사용될 수 있다. 단, 컬렉션이 크고 쓰기보다 읽기 작업이 많고 동기화 오버헤드보다 더 큰 오버헤드를 가지는 작업인 경우 유용하다.
 
 ### 동작 규칙
@@ -506,10 +508,41 @@ Java 8부터 도입된 새로운 락으로, ReadWriteLock의 성능을 개선한
 - 스케줄링 시 읽기 모드나 쓰기 모드와 같은 특정 모드를 우선시 하지 않는다.
 - `try~` 메서드는 공정성을 보장하지 않을 수 있다.
 
+## synchronized vs ReentrantLock
+`ReentrantLock`이 더 최신인 것은 맞다. 그렇다면 `synchronized`는 더 이상 사용할 필요가 없을까?
+
+### synchronized의 장점
+`ReentrantLock`과 비교한 `synchronized`의 장점은 다음과 같다.
+
+1. 압도적인 간결성과 안전성 (휴먼 에러 방지)<br/>
+`ReentrantLock`은 개발자가 락을 획득(`lock()`)하고 해제(`unlock()`)하는 시점을 명시적으로 작성해야 한다. 만약 예외가 발생하여 `unlock()`이 호출되지 않으면 시스템 전체가 멈추는 데드락(Deadlock)에 빠지기 때문에, 반드시 `try-finally` 블록을 사용해야 하는 번거로움이 있다.<br/>
+반면 `synchronized`는 블록 `{ }`을 빠져나가거나 내부에서 예외가 발생하면 JVM이 알아서 락을 안전하게 해제해 준다. 코드가 훨씬 간결해지고 실수 여지가 줄어든다.
+
+2. JVM 수준의 지속적인 성능 최적화<br/>
+과거 초기 Java 버전에서는 `synchronized`의 성능이 무거웠던 것이 사실이다. 하지만 Java 6 이후부터 JVM 엔진 자체가 엄청나게 발전하면서 편향 락(Biased Locking), 경량 락(Lightweight Locking), 락 제거(Lock Elision) 등 다양한 내부 최적화 기법이 적용되었다.<br/>
+결과적으로 현재는 일반적인 상황에서 두 기술 간의 성능 차이는 거의 없으며, 오히려 특정 상황에서는 JVM이 런타임에 최적화하기 더 좋은 `synchronized`가 더 나은 성능을 보이기도 한다.
+
+3. 직관적인 디버깅과 스레드 덤프<br/>
+데드락이나 성능 병목 현상을 추적하기 위해 스레드 덤프(Thread Dump)를 분석할 때, `synchronized`는 JVM의 내장 모니터 락을 사용하므로 어느 스레드가 락을 쥐고 있고 어느 스레드가 대기 중인지 로그에 아주 직관적이고 명확하게 표시된다.
+
+### 각각의 사용이 적절한 케이스
+
+- ✅ `synchronized`를 사용해야 하는 경우 (기본 선택)
+    - 단순한 임계 영역 보호: 블록 하나로 끝나는 간단한 동기화가 필요할 때
+    - 유지보수성 우선: 팀원 누구나 한눈에 동기화 로직을 이해하고 실수 없이 코드를 관리해야 할 때
+    - 복잡한 락 제어가 필요 없을 때: 락을 얻기 위해 무한정 기다려도 시스템에 무리가 없는 일반적인 환경일 때
+
+- ✅ `ReentrantLock`을 사용해야 하는 경우 (고급 제어 필요 시)<br/>
+  `synchronized`로 절대 구현할 수 없는 **구체적인 스케줄링 및 타임아웃 제어**가 필요할 때 고려한다.
+    - 대기 시간 지정 (`tryLock`): 락을 얻기 위해 무한정 대기(Block)하지 않고, "3초만 기다려보고 안 되면 그냥 다른 작업 할게!" 같은 유연한 처리가 필요할 때
+    - 인터럽트 처리 (`lockInterruptibly`): 락을 기다리는 스레드를 강제로 취소(Interrupt)시켜 대기 상태에서 빠져나오게 해야 할 때
+    - 공정성(Fairness) 보장: `new ReentrantLock(true)`를 설정하여, 락을 먼저 요청한 스레드가 먼저 락을 얻도록 대기 줄의 순서를 엄격하게 지켜야 할 때 (synchronized는 무작위로 락을 던져주는 불공정 방식임)
+    - 다중 조건 변수(Condition): 앞서 다루었던 Bounded Buffer 문제에서처럼, 하나의 락에 대해 생산자용 큐와 소비자용 큐(Condition 여러 개)를 따로 분리하여 관리하고 싶을 때
 
 ## References
 - https://jhkimmm.tistory.com/36
 - https://velog.io/@be_have98/Java-ReenterentLock
 - https://zion830.tistory.com/57
 - https://vnthf.github.io/blog/Java-java.util.concurrent.locks/
+- https://sheerheart.tistory.com/entry/%EC%9E%90%EB%B0%94-%EB%B3%91%EB%A0%AC-%ED%94%84%EB%A1%9C%EA%B7%B8%EB%9E%98%EB%B0%8D-13%EC%9E%A5-%EB%AA%85%EC%8B%9C%EC%A0%81%EC%9D%B8-%EB%9D%BD
 - gpt4o
