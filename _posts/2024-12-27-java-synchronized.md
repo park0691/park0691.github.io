@@ -57,13 +57,26 @@ monitor A {
 	- 동기화 제약 조건을 개발자가 직접 코딩하지 않아도 된다.
 
 #### 조건 변수, Conditional Variables
+- 멀티스레드 환경에서 스레드 간의 동기화를 위해 사용되는 필수적인 운영체제 개념이자 프로그래밍 기법
+- 이름 그대로, **특정 상태나 조건(Condition)이 만족될 때까지 스레드를 잠재우고(Wait), 조건이 만족되면 자고 있는 스레드에게 신호를 보내 깨워주는(Signal/Notify) 메커니즘**
+
 ##### 상호 배제의 한계
 ![monitor](https://1drv.ms/i/c/9251ef56e0951664/IQQud1q7B-fjQJq3IazFy9GyAbNsawmoF--yI72JotSvm0c?width=1024)
 
-다음과 같이 락을 거는 상호 배제만으로 동기화에 한계가 있다. 락은 지금 자원을 쓰고 있는지만 판단할 뿐, 연산을 수행하기 전 <u>어떤 조건(e.g. 버퍼가 비어 있지 않은가?)이 만족할 때까지 기다려야 하는 논리는 구현할 수 없다</u>. (condition이 참인지 체크)
+상호 배제(Lock)는 "한 번에 한 명만 자원을 쓴다"는 규칙은 지켜주지만, **"특정 조건이 만족될 때까지 기다린다"**(*e.g. 버퍼가 비어 있지 않은가?*)는 로직은 표현하지 못한다. 조건 변수는 바로 이 **'실행 순서의 제어'**를 담당하는 모니터의 핵심 요소이다.
 
 **[Spin-based Approach : CPU 시간 낭비]**<br/>
-이를 위해 전역 변수를 하나 선언하고 작업 스레드가 완료될 때 이 값을 바꾼다. waiter는 해당 값이 바뀔 때까지 체크하는 `while` 루프를 고려할 수 있다. 그러나 작업 스레드가 완료될 때까지 waiter는 계속 CPU를 점유하여 자원 효율이 좋지 않다.
+이를 위해 전역 변수를 하나 선언하고 작업 스레드가 완료될 때 이 값을 바꾼다. waiter는 해당 값이 바뀔 때까지 체크하는 `while` 루프를 고려할 수 있다.(**Busy Waiting**) 그러나 작업 스레드가 완료될 때까지 waiter는 계속 **CPU를 점유하여 자원 효율이 좋지 않다.**
+
+조건 변수는 이 문제를 우아하게 해결한다. 스레드는 무한 루프를 도는 대신, 조건 변수가 관리하는 대기 큐(Wait Queue)에 들어가 스스로 수면(Block) 상태에 빠진다. CPU를 전혀 소모하지 않고 얌전히 기다리다가, 소비자 스레드가 데이터를 꺼내 간 뒤 "이제 공간이 생겼어!"라고 신호를 주면 그때 깨어나서 작업을 재개한다.
+
+> **우선순위 역전, Priority Inversion**<br/>
+> Spin-wait은 단순히 CPU 자원을 낭비할 뿐만 아니라, 우선순위가 낮은 스레드가 락을 쥔 채 Busy-wait 중인 높은 우선순위 스레드에게 CPU를 양보하지 못하는 우선순위 역전(Priority Inversion) 문제를 심화시킬 수 있다.
+{: .prompt-warning }
+
+> **Mutex와 Spin Lock**<br/>
+> Mutex와 Spin Lock은 락을 획득하지 못했을 때의 대응 방식에 따라 엄격하게 구분되는 개념이다. Spin Lock은 CPU 자원을 소모하며 무한히 확인(Busy-waiting)하는 방식이고, Mutex는 락을 얻지 못하면 큐에 들어가 수면(Sleep/Block) 상태로 전환하여 CPU 자원을 양보하는 방식이다.
+{: .prompt-warning }
 
 ##### Producer / Consumer (Bound Buffer) 문제
 - Producer
@@ -151,11 +164,8 @@ public method consumer() {
 
 Producer는 큐가 Non-full 될 때까지 block 되게 만들고, Consumer는 큐가 Non-empty 될 때까지 block 되게 만들면 이 문제를 해결할 수 있다.
 
-Mutex 자신 또한 Spin Lock이 될 수 있다. Spin Lock은 락을 획득하기 위해 Busy-waiting을 수반하지만 CPU 자원 낭비 문제를 해결할 수 있는 개념이다. 코드에서 사용한 `queueLock`은 Spin Lock이 아니라고 가정한다.
-
 ##### Definition
-- 모니터 타입만으로 동기화를 구현하는 데 충분하지 않으므로 `condition` 변수를 통해 동기화 매커니즘을 제공한다.
-    - 스레드를 잠들게 하거나, 자고 있는 스레드를 깨우는 기능을 지원 (기존 Mutex/Semaphore는 lock을 잡은 채로 대기했으나 `wait()`가 내부적으로 락 해제 후 블록시킴)
+- 상호 배제(Mutex)만으로 복잡한 실행 순서를 동기화하기에 불충분하므로, 조건 변수를 통해 스레드를 대기시키거나 깨우는 동기화 메커니즘을 제공한다.
 
 ```
 condition x, y;
@@ -164,7 +174,7 @@ x.signal();
 ```
 
 - 조건이 충족될때까지 <u>기다리는 여러 스레드를 저장하는 큐(Waiting Queue)</u>가 있다.
-    - Waiting Queue : 조건이 충족되길 기다리는 스레드들이 대기 상태로 머무르는 큐
+    - **Waiting Queue (대기 큐)** : 조건이 충족되길 기다리는 스레드들이 대기 상태로 머무르는 큐. 각 조건 변수마다 고유한 대기 큐를 가진다.
 
 > 어떻게 Condition을 기다리는가?
 > - Waiting on the condition
@@ -184,36 +194,46 @@ x.signal();
   - 다른 프로세스에서 `x.signal()` 호출하기 전까지 대기 상태
 - `memoryless`
     - 조건 변수는 이전에 signal 온 사실을 저장하지 않으므로, `wait()`은 이전에 signal 이 왔던 안왔던 안왔던 무조건 스레드를 잠들게 한다.
+    
+    > 세마포어와의 비교
+    > **세마포어**의 경우 `signal(V)`을 호출하면 내부 카운트가 증가하여 상태가 저장되므로 나중에 wait(P)를 호출한 스레드가 대기 없이 통과할 수 있다. 반면, 조건 변수는 상태를 기억하지 못하므로 대기 중인 스레드가 없을 때 `signal()`을 호출하면 그 신호는 그냥 **증발(Lost Wakeup)**해 버린다. 따라서 조건 변수의 `wait()`은 이전에 신호가 있었는지 여부와 무관하게 무조건 스레드를 잠재운다.
+    {: .prompt-tip }
 
 ##### 주요 연산
 스레드가 Condition Variable에서 기다리는 동안 그 스레드는 모니터를 소유할 수 없다. 다른 스레드는 모니터에 들어가 모니터의 상태를 바꿀 수 있다. 대부분 다른 스레드들은 assertion이 참이 되었다고 Condition Variable에게 시그널을 보낸다.
 
 - `wait(Condition_Variable cv, Mutex m)`
+    - 스레드가 조건이 충족되지 않음을 확인하면, 쥐고 있던 락(Lock)을 내려놓고 대기 상태에 들어간다. (다른 스레드가 락을 얻고 작업할 수 있게 양보한다.)
     - `blocks the calling thread` (호출한 스레드를 블럭시키며 **<u>락을 포기</u>**한다.)
         - 잠들기 전 락을 해제해야 다른 스레드가 락을 획득할 수 있으므로 락을 해제하고 잠든다.
         - `wait()` 호출될 때 Mutex 락은 획득된 상태이어야 한다.
     - 스레드에 의해 호출되는데 assertion이 참이 될 때까지 기다리게 한다. 스레드가 기다리는 동안 모니터를 소유할 수 없다.
-    - Atomic : 이 연산은 `atomic`해야 한다. 즉 다음 순서가 진행될 동안 외부에 의해 방해 받으면 안 된다. 그렇지 않으면 release lock과 sleep 사이에 다른 스레드가 끼어들어 문제 일으킬 수 있다.
-        1. `Mutex m`락을 해제한다.
-        2. 호출한 현재 스레드를 Running 상태에서 Condition Variable의 Wait Queue로 보내어 그 스레드를 재운다. (Sleep / Block) 
-        3. 컨텍스트는 다른 스레드에게 양도된다. (CPU 자원 양도)
+    - Atomic : 이 연산은 `atomic`해야 한다. 즉, 외부에 의해 방해 받으면 안 된다. 그렇지 않으면 release lock과 sleep 사이에 다른 스레드가 끼어들어 문제 일으킬 수 있다.
+        - **`wait()`의 원자적 동작**
+            1. `release lock m`: `Mutex m`락을 해제한다.
+            2. `put thread to sleep on cv`: 호출한 현재 스레드를 Running 상태에서 Condition Variable의 Wait Queue로 보내어 그 스레드를 재운다. (**Sleep / Block**) 
+            - 이 두 과정 사이에 다른 스레드가 개입하여 `signal()` 보내면 현재 스레드는 신호를 영원히 놓치고 잠드는 **Lost Wakeup** 문제가 발생한다. 따라서 OS 수준에서 이 과정은 원자적으로 처리된다.
     - 그 스레드가 signal 받아서 다시 일을 한다면 자동으로 `Mutex m` 락을 획득한다.
         - 다시 락을 얻어야만 Critical Section에 진입할 수 있으므로!
     
 - `signal(Condition_Variable cv)` / `notify(Condition_Variable cv)`
+    - 상태를 변경하여 조건을 충족시킨 다른 스레드가, 대기 중인 스레드 중 하나를 깨운다.
     - assertion이 참이 되면 스레드가 호출하는 함수
     - Condition Variable에서 대기 중인 스레드가 있는 경우 한 스레드를 깨운다.
       - 하나 이상의 스레드가 Condition Variable의 Sleep Queue 에서 Ready Queue로 이동하게 한다.
     - 보통 `Mutex m`을 놓아주기 전에 signal 하는 게 좋은 구현이지만, signal 전에 `Mutex m`을 놓아주기도 한다.
     
 - `broadcast(Condition_Variable cv)` / `notifyAll(Condition_Variable cv)`
+    - 대기 중인 모든 스레드를 한 번에 다 깨운다.
     - `signal` 함수와 동일한 조건이지만 Wait Queue의 모든 스레드를 깨운다. (Wait Queue를 비움)
     - Condition Variable와 연관된 스레드가 2개 이상이면 signal 대신 broadcast를 호출한다.
 
-**[1:N 관계]**<br/>
-여러 개의 Condition Variable은 하나의 Mutex에 연관될 수 있지만 그 역은 성립하지 않는다. (Mutex와 Condition Variable의 관계는 1:N) 똑같은 Mutex를 필요로 하는 같은 Variable 내에 다른 Condition을 기다리고 싶어하는 다른 스레드가 존재하기 때문이다.
+**[1:N 관계 (하나의 Mutex와 여러 개의 Condition Variable)]**<br/>
+여러 개의 Condition Variable은 하나의 Mutex에 연관될 수 있다 (`1:N` 관계). 즉, 하나의 모니터(단일 락) 안에서 각기 다른 조건을 기다리는 독립적인 대기 큐를 여러 개 운용할 수 있다.
 
-Producer / Consumer 예시에서 큐는 Unique한 Mutex에 의해 보호되지만 <u>다른 Condition Variable을 사용</u>하는 것이 좋다. (각각의 모니터 사용) Producer 스레드는 `Mutex m`, `Condition Variable c_full`(큐가 가득 안 찰 때까지 블록하는 조건 변수)을 사용해서 기다린다면 Consumer 스레드는 같은 Mutex를 사용하지만 다른 Condition Variable인 `c_empty`(큐가 빌 때까지 블록하는 조건 변수)를 사용하는 다른 모니터에서 기다리는 게 좋다. (⇒ **<u>Consumer는 Producer만 깨우고, Producer는 Consumer만 깨우게 할 수 있기 때문이다.</u>**)
+Producer / Consumer 예시에서, 큐(공유 자원)는 단일 Mutex로 보호되지만 조건 변수는 두 개(`c_full`, `c_empty`)로 분리하는 것이 이상적이다.
+
+Producer 스레드는 큐가 가득 차지 않기를 기다릴 때 `c_full` 큐에서 대기하고, Consumer 스레드는 큐가 비지 않기를 기다릴 때 `c_empty` 큐에서 대기한다. 이렇게 하면 **Consumer는 자기가 데이터를 소비한 후 Producer들만 깨울 수 있고, Producer는 데이터를 넣은 후 Consumer들만 명확히 타겟팅하여 깨울 수 있으므로** 불필요한 스레드가 깨어나는 컨텍스트 스위칭 낭비를 막을 수 있다.
 
 ##### Signal Semantics
 만약 프로세스 P의 `signal()` 이 대기 중인(sleep) 프로세스 Q를 깨웠을 때(resume) 프로세스 P는 계속 실행되어야 할까? or 프로세스 Q가 실행되어야 할까?
@@ -327,7 +347,7 @@ public method consumer() {
 - Java에서 동기화와 관련된 동시성 제어의 기본 단위
 - 모든 Java 객체는 모니터를 가진다.
 - 여러 스레드가 임계 영역에 진입할 때 JVM은 모니터를 사용해 스레드 간 동기화를 제공한다.
-- 상호 배제, 협력 두 가지 동기화 기능을 제공하며, 이를 위해 뮤텍스와 조건 변수를 제공한다.
+- 상호 배제, 협력 두 가지 동기화 기능을 제공하며, 이를 위해 뮤텍스와 조건 변수를 사용한다.
 
 > 왜 모니터라 부를까?<br/>
 > 스레드가 자원에 어떻게 접근하는지 모니터링하기 때문이다.
@@ -908,3 +928,4 @@ _출처 : https://velog.io/@appti/%EC%9E%90%EB%B0%94-synchronized_
 - https://steady-coding.tistory.com/556
 - Silberschatz et al. 『Operating System Concepts』. WILEY, 2020.
 - gpt4o
+- Gemini 3.1 Pro
