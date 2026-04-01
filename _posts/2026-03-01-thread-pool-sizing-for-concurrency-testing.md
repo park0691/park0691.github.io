@@ -1,7 +1,7 @@
 ---
 title: 왜 스레드 풀 사이즈가 동시성 테스트의 신뢰도를 결정하나?
 date: 2026-03-01 23:55 +0900
-categories: Concurrrency
+categories: Java
 tags: concurrency, thread
 ---
 
